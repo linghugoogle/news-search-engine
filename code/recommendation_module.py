@@ -49,7 +49,8 @@ class RecommendationModule:
         f = open(self.stop_words_path, encoding = self.stop_words_encoding)
         words = f.read()
         self.stop_words = set(words.split('\n'))
-    
+
+    # 将K近邻写入数据库
     def write_k_nearest_matrix_to_db(self):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -72,8 +73,15 @@ class RecommendationModule:
         except ValueError:
             return False
             
-    
+    # 一篇文档用向量表示，提取每篇新闻的关键词，
+    # 用这些关键词的tfidf值构成文档的向量表示，这样能够大大减少相似度计算量，同时保持较好的推荐效果。
+
+    # files为文档的xml文件
     def construct_dt_matrix(self, files, topK = 200):
+
+        print("--begin matrix--")
+
+        # jieba分词组件自带关键词提取功能，并能返回关键词的tfidf值
         jieba.analyse.set_stop_words(self.stop_words_path)
         jieba.analyse.set_idf_path(self.idf_path)
         M = len(files)
@@ -108,9 +116,15 @@ class RecommendationModule:
         dt_matrix = pd.DataFrame(dt_matrix)
         dt_matrix.index = dt_matrix[0]
         print('dt_matrix shape:(%d %d)'%(dt_matrix.shape))
+
+        print("--end matrix--")
         return dt_matrix
-        
+
+    # 计算K近邻矩阵
     def construct_k_nearest_matrix(self, dt_matrix, k):
+
+        print("--begin kn--")
+
         tmp = np.array(1 - pairwise_distances(dt_matrix[dt_matrix.columns[1:]], metric = "cosine"))
         similarity_matrix = pd.DataFrame(tmp, index = dt_matrix.index.tolist(), columns = dt_matrix.index.tolist())
         for i in similarity_matrix.index:
@@ -123,8 +137,13 @@ class RecommendationModule:
                     tmp[1].append(int(max_col)) #max column name
                     j += 1
             self.k_nearest.append(tmp)
-    
+        print("--end kn--")
+
+    # 获得逆文档频率
     def gen_idf_file(self):
+
+        print("--begin idf--")
+
         files = listdir(self.doc_dir_path)
         n = float(len(files))
         idf = {}
@@ -146,17 +165,30 @@ class RecommendationModule:
         for word, df in idf.items():
             idf_file.write('%s %.9f\n'%(word, math.log(n / df)))
         idf_file.close()
-        
+
+        print("--end idf--")
+
+    # 寻找K近邻
     def find_k_nearest(self, k, topK):
+
+        # 生成idf
         self.gen_idf_file()
+
         files = listdir(self.doc_dir_path)
         dt_matrix = self.construct_dt_matrix(files, topK)
+
         self.construct_k_nearest_matrix(dt_matrix, k)
+
         self.write_k_nearest_matrix_to_db()
         
 if __name__ == "__main__":
     print('-----start time: %s-----'%(datetime.today()))
+
+    # 构造函数
     rm = RecommendationModule('../config.ini', 'utf-8')
+
+    # 寻找K近邻
     rm.find_k_nearest(5, 25)
+
     print('-----finish time: %s-----'%(datetime.today()))
     
