@@ -27,7 +27,7 @@ def init():
     dir_path = config['DEFAULT']['doc_dir_path']
     db_path = config['DEFAULT']['db_path']
 
-
+# 主页
 @app.route('/')
 def main():
     init()
@@ -45,7 +45,10 @@ def search():
         #print(keys)
         if keys not in ['']:
             print(time.clock())
+
+            # 进行搜索
             flag,page = searchidlist(keys)
+
             if flag==0:
                 return render_template('search.html', error=False)
             docs = cut_page(page, 0)
@@ -58,12 +61,15 @@ def search():
     except:
         print('search error')
 
-
+# 调用搜索引擎
 def searchidlist(key, selected=0):
     global page
     global doc_id
+
+    # 搜索引擎search_engine
     se = SearchEngine('../config.ini', 'utf-8')
     flag, id_scores = se.search(key, selected)
+
     # 返回docid列表
     doc_id = [i for i, s in id_scores]
     page = []
@@ -71,13 +77,13 @@ def searchidlist(key, selected=0):
         page.append(i)
     return flag,page
 
-
+# 切分页面
 def cut_page(page, no):
     docs = find(doc_id[no*10:page[no]*10])
     return docs
 
 
-# 将需要的数据以字典形式打包传递给search函数
+# 将需要的数据以字典形式打包传递给search函数，显示搜索摘要
 def find(docid, extra=False):
     docs = []
     global dir_path, db_path
@@ -100,7 +106,7 @@ def find(docid, extra=False):
         docs.append(doc)
     return docs
 
-
+# 下一页
 @app.route('/search/page/<page_no>/', methods=['GET'])
 def next_page(page_no):
     try:
@@ -111,7 +117,7 @@ def next_page(page_no):
     except:
         print('next error')
 
-
+# 按照相关、时间、热度等排序
 @app.route('/search/<key>/', methods=['POST'])
 def high_search(key):
     try:
@@ -121,16 +127,23 @@ def high_search(key):
                 checked[i] = 'checked="true"'
             else:
                 checked[i] = ''
+
+        # selected为排序方式
         flag,page = searchidlist(key, selected)
+
+        # 第一次搜索
         if flag==0:
             return render_template('search.html', error=False)
         docs = cut_page(page, 0)
+
+        # 有了搜索结果
         return render_template('high_search.html',checked=checked ,key=keys, docs=docs, page=page,
                                error=True)
     except:
         print('high search error')
 
 
+# 跳转到具体的界面
 @app.route('/search/<id>/', methods=['GET', 'POST'])
 def content(id):
     try:
@@ -140,6 +153,7 @@ def content(id):
         print('content error')
 
 
+# 推荐最接近的K个
 def get_k_nearest(db_path, docid, k=5):
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
